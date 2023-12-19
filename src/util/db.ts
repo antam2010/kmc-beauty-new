@@ -35,6 +35,5 @@ export default async function dbConnect(): Promise<Pool> {
   if (!connection) {
     connection = createDatabasePool();
   }
-
   return connection;
 }

@@ -2,6 +2,7 @@
 import dbConnect from '@/util/db';
 import { createResponse, handleErrorResponse } from '@/util/utils';
 import { RowDataPacket } from 'mysql2/promise';
+import { verifyPassword } from '@/util/bcrpt';
 
 interface Payload {
   login_id: string;
@@ -9,26 +10,25 @@ interface Payload {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const result: any = {}
   const req: Payload = await request.json();
-  
   try {
-    const db = await dbConnect();
-    const [chkRow]: [RowDataPacket[], any] = await db.query(
-      "SELECT COUNT(*) AS cnt FROM kmc_login WHERE login_id = ?",
-      [req.login_id]
-    );
 
-    if (chkRow[0].cnt === 0) {
-      return createResponse("회원이 존재하지 않습니다.", 404, null);
+    const db = await dbConnect();
+    const [info]: [RowDataPacket[], any] = await db.query("SELECT login_idx, login_id, login_pw, login_token FROM kmc_login WHERE login_id = ?", [req.login_id]);
+    if (info.length === 0) {
+      throw ({ message: "아이디가 존재하지 않습니다.", status: 400 });
     }
 
-    const [rows]: [RowDataPacket[], any] = await db.query(
-        "SELECT * FROM kmc_login WHERE login_id = ? AND login_pw = ?",
-        [req.login_id, req.login_pw]
-    );
-    console.log(rows);
+    const isPwdMath = await verifyPassword(req.login_pw, info[0].login_pw)
+    if (isPwdMath !== true) {
+      throw ({ message: "비밀번호가 일치하지 않습니다", status: 400 });
+    }
 
-    return createResponse("Data retrieved successfully", 200, chkRow);
+    result.info = info[0]
+
+    return createResponse({ data: result });
+
   } catch (error) {
     return handleErrorResponse(error);
   }
